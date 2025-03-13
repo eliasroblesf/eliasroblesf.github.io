@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reload My Video</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #videoContainer {
+            margin-top: 20px;
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+        }
+        #player {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reload My Video</h1>
+        <form id="settingsForm">
+            <div class="form-group">
+                <label for="videoUrl">YouTube Video URL:</label>
+                <input type="url" id="videoUrl" required 
+                    placeholder="https://youtube.com/watch?v=...">
+            </div>
+            <div class="form-group">
+                <label for="reloadMinutes">Reload every (minutes):</label>
+                <input type="number" id="reloadMinutes" min="1" value="5" required>
+            </div>
+            <div class="form-group">
+                <label for="reloadCount">Number of reloads:</label>
+                <input type="number" id="reloadCount" min="1" value="3" required>
+            </div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="loopVideo"> Continuous Loop
+                </label>
+            </div>
+            <button type="submit">Start Session</button>
+        </form>
+        <div id="videoContainer">
+            <div id="player"></div>
+        </div>
+    </div>
+
+    <script>
+        // Load YouTube IFrame API
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        let player;
+        let reloadInterval;
+        let remainingReloads = 0;
+
+        // Load saved settings
+        const savedSettings = JSON.parse(localStorage.getItem('videoSettings') || '{}');
+        if (savedSettings.videoUrl) {
+            document.getElementById('videoUrl').value = savedSettings.videoUrl;
+        }
+        if (savedSettings.reloadMinutes) {
+            document.getElementById('reloadMinutes').value = savedSettings.reloadMinutes;
+        }
+        if (savedSettings.reloadCount) {
+            document.getElementById('reloadCount').value = savedSettings.reloadCount;
+        }
+        if (savedSettings.loopVideo) {
+            document.getElementById('loopVideo').checked = savedSettings.loopVideo;
+        }
+
+        // Auto-submit form if settings exist
+        if (savedSettings.videoUrl && savedSettings.reloadMinutes && savedSettings.reloadCount) {
+            document.getElementById('settingsForm').dispatchEvent(new Event('submit'));
+        }
+        
+        if (savedSettings.videoUrl && savedSettings.reloadMinutes && savedSettings.reloadCount) {
+            document.getElementById('settingsForm').dispatchEvent(new Event('submit'));
+        }
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                playerVars: {
+                    autoplay: 1,
+                    loop: savedSettings.loopVideo ? 1 : 0,
+                    playlist: savedSettings.videoId
+                },
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            if (savedSettings.videoId) {
+                loadVideo(savedSettings.videoId);
+                if (savedSettings.loopVideo) {
+                    player.setLoop(true);
+                }
+                player.playVideo();
+            }
+        }
+
+        function loadVideo(videoId) {
+            player.loadVideoById(videoId);
+            player.playVideo();
+        }
+
+        document.getElementById('settingsForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const videoUrl = document.getElementById('videoUrl').value;
+            const reloadMinutes = document.getElementById('reloadMinutes').value;
+            const reloadCount = document.getElementById('reloadCount').value;
+            
+            // Extract video ID from URL
+            const videoId = new URL(videoUrl).searchParams.get('v');
+            
+            // Save settings
+            const settings = {
+                videoUrl,
+                videoId,
+                reloadMinutes,
+                reloadCount,
+                loopVideo: document.getElementById('loopVideo').checked
+            };
+            localStorage.setItem('videoSettings', JSON.stringify(settings));
+            
+            // Start reload cycle
+            startReloadCycle(reloadMinutes, reloadCount);
+            
+            // Load video
+            loadVideo(videoId);
+        });
+
+        function startReloadCycle(minutes, count) {
+            if (reloadInterval) clearInterval(reloadInterval);
+            remainingReloads = count;
+            
+            const intervalMs = minutes * 60 * 1000;
+            reloadInterval = setInterval(() => {
+                remainingReloads--;
+                if (remainingReloads <= 0) {
+                    if (!savedSettings.loopVideo) {
+                        clearInterval(reloadInterval);
+                    } else {
+                        remainingReloads = count;
+                    }
+                }
+                window.location.reload();
+            }, intervalMs);
+        }
+    </script>
+</body>
+</html>
